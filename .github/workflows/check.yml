@@ -1,0 +1,60 @@
+name: Check Cloudflare IPs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download current IP lists
+        run: |
+          curl -fsSL https://www.cloudflare.com/ips-v4 -o ips-v4
+          curl -fsSL https://www.cloudflare.com/ips-v6 -o ips-v6
+
+      - name: Compare checksums
+        id: check
+        run: |
+          if sha256sum --check checksums.sha256 --status; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "IPs unchanged."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "IPs have changed!"
+          fi
+
+      - name: Open GitHub Issue if IPs changed
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚠️ Cloudflare IP ranges changed',
+              body: `The Cloudflare public IP ranges have changed.\n\nPlease review and update your firewall/allowlist rules accordingly.\n\n[View workflow run](${runUrl})`,
+              labels: ['cloudflare', 'security'],
+              headers: {
+                'X-GitHub-Api-Version': '2026-03-10'
+              }
+            });
+
+      - name: Update checksums and commit
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          sha256sum ips-v4 ips-v6 > checksums.sha256
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add checksums.sha256
+          git commit -m "chore: update Cloudflare IP checksums [skip ci]"
+          git push
