@@ -6,6 +6,8 @@ workflows:
     '.github/workflows/check.yml':
         - 'actions/checkout@v6.1.0'
         - 'actions/github-script@v9.0.0'
+    '.github/workflows/verify-lockfile.yml':
+        - 'actions/checkout@v6.1.0'
 dependencies:
     'actions/checkout@v6.1.0':
         ref: 'v6.1.0'
