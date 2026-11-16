@@ -1,0 +1,61 @@
+name: Verify Actions Lockfile
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.LOCK_PUSH_TOKEN }}
+
+      - name: Install gh-actions-lock
+        run: gh extension install github/gh-actions-lock --pin v0.4.1
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Verify lockfile
+        id: verify
+        continue-on-error: true
+        run: gh actions-lock --verify --no-interactive
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Update lockfile
+        if: steps.verify.outcome == 'failure'
+        run: gh actions-lock --no-interactive
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Verify again
+        if: steps.verify.outcome == 'failure'
+        run: gh actions-lock --verify --no-interactive
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Commit updated lockfile
+        if: >-
+          steps.verify.outcome == 'failure' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update actions lockfile"
+          git push
