@@ -3,8 +3,8 @@ name: Check Cloudflare IPs
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * *'
-    - cron: '5 10 * * *'
+    - cron: '4 6 * * *'
+    - cron: '7 10 * * *'
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
 
     steps:
       - uses: actions/checkout@v6
@@ -44,7 +44,6 @@ jobs:
               repo: context.repo.repo,
               title: '⚠️ Cloudflare IP ranges changed',
               body: `The Cloudflare public IP ranges have changed.\n\nPlease review and update your firewall/allowlist rules accordingly.\n\n[View workflow run](${runUrl})`,
-              labels: ['cloudflare', 'security'],
               headers: {
                 'X-GitHub-Api-Version': '2026-03-10'
               }
